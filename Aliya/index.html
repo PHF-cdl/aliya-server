@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>COSMOS 通讯终端</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body {
+  background: #2b2d31;
+  color: #e2e4e8;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 15px;
+}
+#chatContainer {
+  height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+#chatContainer::-webkit-scrollbar {
+  width: 6px;
+}
+#chatContainer::-webkit-scrollbar-thumb {
+  background: #4a4c50;
+  border-radius: 3px;
+}
+.aliya-bubble {
+  background: #3a3d42;
+  border-radius: 18px;
+  max-width: 72%;
+  padding: 10px 16px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.player-bubble {
+  background: #45484d;
+  border-radius: 18px;
+  max-width: 72%;
+  padding: 10px 16px;
+  line-height: 1.5;
+  margin-left: auto;
+  word-break: break-word;
+}
+.nav-btn {
+  background: #3a3d42;
+  color: #c8cacd;
+  padding: 6px 22px;
+  border-radius: 10px;
+  font-size: 18px;
+  transition: 0.2s;
+}
+.nav-btn.active {
+  background: #484b50;
+  color: #ffffff;
+}
+.bar-bg {
+  background: #1e2024;
+  height: 12px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.bar-fill-cos {
+  background: linear-gradient(90deg, #c99a3a, #e2b856);
+  height: 100%;
+  width: 75%;
+}
+.bar-fill-oxy {
+  background: linear-gradient(90deg, #4a96c9, #64b4e6);
+  height: 100%;
+  width: 62%;
+}
+.bar-fill-water {
+  background: linear-gradient(90deg, #52a86e, #73c98e);
+  height: 100%;
+  width: 48%;
+}
+.display-window {
+  background: #1e2024;
+  border: 2px solid #3a3d42;
+  border-radius: 6px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b6e73;
+  font-size: 13px;
+}
+#userInput {
+  background: #3a3d42;
+  color: #e2e4e8;
+  border: none;
+  outline: none;
+  border-radius: 10px;
+}
+#userInput::placeholder {
+  color: #7a7d82;
+}
+#sendBtn {
+  background: #484b50;
+  color: #e2e4e8;
+  border-radius: 10px;
+  transition: 0.2s;
+}
+#sendBtn:hover {
+  background: #53565b;
+}
+#sendBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
+</head>
+<body class="max-w-[1400px] mx-auto h-screen p-4 flex flex-col box-border">
+
+<div class="flex gap-3 mb-5">
+  <button class="nav-btn active">Operation</button>
+  <button class="nav-btn">SOS</button>
+  <button class="nav-btn">FCS</button>
+  <button class="nav-btn">Settings</button>
+</div>
+
+<div class="flex flex-1 gap-6 overflow-hidden">
+  <div class="w-[72%] flex flex-col">
+    <div id="chatContainer" class="space-y-5 px-2"></div>
+    <div class="flex gap-3 mt-4">
+      <textarea id="userInput" class="flex-1 p-3 resize-none h-14" placeholder="向通讯终端输入消息..."></textarea>
+      <button id="sendBtn" class="px-7">发送</button>
+    </div>
+  </div>
+
+  <div class="w-[28%] flex flex-col gap-4 px-2">
+    <div class="text-3xl font-bold tracking-wider text-gray-100">ALIYA</div>
+    <div class="mt-1">
+      <div class="text-5xl font-mono font-light text-amber-400">115</div>
+      <div class="text-xs text-gray-400 tracking-widest mt-1">HEART RATE</div>
+    </div>
+    <div class="space-y-3 mt-2">
+      <div>
+        <div class="text-xs text-gray-400 mb-1 tracking-wide">COSMOS</div>
+        <div class="bar-bg"><div class="bar-fill-cos"></div></div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-400 mb-1 tracking-wide">OXYGEN</div>
+        <div class="bar-bg"><div class="bar-fill-oxy"></div></div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-400 mb-1 tracking-wide">WATER</div>
+        <div class="bar-bg"><div class="bar-fill-water"></div></div>
+      </div>
+    </div>
+    <div class="display-window mt-2">图像显示终端</div>
+  </div>
+</div>
+
+<script>
+// ========== 全局变量 ==========
+const chatBox = document.getElementById('chatContainer');
+const input = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+let isSending = false;
+
+// ========== 工具函数（已全部定义，不会缺失） ==========
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function splitSentences(text) {
+  const result = text.match(/[^。！？……]+[。！？……]*/g)
+  return result ? result.filter(s => s.trim()) : [text]
+}
+
+// 动态时长弹出：句子越长间隔越久
+async function popReply(text) {
+  const sentences = splitSentences(text)
+  for (let s of sentences) {
+    const content = s.trim()
+    const delay = 400 + content.length * 25
+    await sleep(delay)
+    addMessage(content, false)
+  }
+}
+
+// ========== 开场自动对话（动态时长） ==========
+const initDialogue = [
+  "COSMOS？",
+  "能听到吗？",
+  "系统重启完成了没有？",
+  "Kane受伤了，很严重",
+  "是张力性气胸，胸腔穿刺从第几处胸骨刺入来着？",
+  "COSMOS，快告诉我",
+  "快一点，他撑不了多久了"
+]
+
+async function playInitDialogue() {
+  sendBtn.disabled = true
+  input.disabled = true
+  for (let text of initDialogue) {
+    const delay = 600 + text.length * 25
+    await sleep(delay)
+    addMessage(text, false)
+  }
+  sendBtn.disabled = false
+  input.disabled = false
+  input.focus()
+}
+
+// 页面加载完成后执行
+window.onload = playInitDialogue
+
+// ========== 渲染消息 ==========
+function addMessage(text, isPlayer){
+  const wrap = document.createElement('div');
+  if(isPlayer){
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    wrap.className = 'flex flex-col items-center gap-1';
+    wrap.innerHTML = `
+      <div class="text-xs text-gray-500">${timeStr}</div>
+      <div class="w-full flex justify-end">
+        <div class="player-bubble">${text}</div>
+      </div>
+    `
+  }else{
+    wrap.className = 'flex';
+    wrap.innerHTML = `<div class="aliya-bubble">${text}</div>`
+  }
+  chatBox.appendChild(wrap);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// ========== 发送消息 ==========
+sendBtn.onclick = async ()=>{
+  if(isSending) return
+  const msg = input.value.trim();
+  if(!msg) return;
+
+  isSending = true
+  sendBtn.disabled = true
+  addMessage(msg, true);
+  input.value = '';
+  addMessage("……", false);
+
+  try {
+    const res = await fetch('http://localhost:3000/chat',{
+      method:'POST',
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({userMsg:msg})
+    })
+    const data = await res.json();
+    chatBox.removeChild(chatBox.lastChild);
+    await popReply(data.reply);
+  } catch(err) {
+    chatBox.removeChild(chatBox.lastChild);
+    addMessage("通讯信号中断了……", false);
+  } finally {
+    isSending = false
+    sendBtn.disabled = false
+  }
+}
+
+// 回车发送
+input.onkeydown = e=>{
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendBtn.click();
+  }
+}
+</script>
+</body>
+</html>
